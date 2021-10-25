@@ -25,6 +25,7 @@ FLAGS
 first, install it:
 
 ```bash
+go install github.com/cirocosta/git-serve@latest
 ```
 
 then
