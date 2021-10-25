@@ -1,9 +1,16 @@
+
 # git-serve
 
 an http git server with no auth that lets you clone & push to repositories
 on-demand.
 
 (pretty much a thin wrapper around github.com/nulab/go-git-http-xfer)
+
+
+- [usage](#usage)
+  - [kubernetes](#kubernetes)
+  - [locally](#locally)
+- [license](#license)
 
 ## usage
 
@@ -18,38 +25,6 @@ FLAGS
   -directory /tmp/git  where git repositories should be stored
   -git /usr/bin/git    absolute path to git executable
   -verbose=false       turn verbose logs on/off
-```
-
-### locally
-
-first, install it:
-
-```bash
-go install github.com/cirocosta/git-serve@latest
-```
-
-then
-
-```bash
-# start the server storing repositories at `/tmp/git-serve`.
-#
-git serve -directory=/tmp/git-serve
-
-
-# clone an empty repository
-#
-git clone http://localhost:8080/foo
-
-
-# get inside the repository and write something to a file
-#
-cd foo
-echo "foo" > ./foo
-
-
-# commit and push
-#
-git add --all . && git commit -m "foo" && git push origin HEAD
 ```
 
 
@@ -97,13 +72,10 @@ Succeeded
 
 2. make use of it
 
-for instance, running a job `commit-and-push` from the default namespace, we
+for instance, running a job `commit-and-push` from the `default` namespace, we
 can target the server running in the `git-serve` namespace from within a pod
-using plain `git clone` as
+using plain `git clone git-serve.<namespace>`  like
 
-```
-git clone 
-```
 
 ```bash
 kubectl apply -f <(echo '---
@@ -135,6 +107,41 @@ spec:
 ')
 ```
 
-## LICENSE
+
+### locally
+
+you can also run `git-serve` locally if you wish as long as you have `git`
+installed. 
+
+```bash
+go install github.com/cirocosta/git-serve@latest
+```
+
+then
+
+```bash
+# start the server storing repositories at `/tmp/git-serve`.
+#
+git serve -directory=/tmp/git-serve
+
+
+# clone an empty repository
+#
+git clone http://localhost:8080/foo
+
+
+# get inside the repository and write something to a file
+#
+cd foo
+echo "foo" > ./foo
+
+
+# commit and push
+#
+git add --all . && git commit -m "foo" && git push origin HEAD
+```
+
+
+## license
 
 MIT
