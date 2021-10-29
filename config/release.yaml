@@ -1,4 +1,15 @@
 ---
+apiVersion: kbld.k14s.io/v1alpha1
+kind: Config
+sources:
+  - image: image
+    path: .
+destinations:
+  - image: image
+    newImage: docker.io/cirocosta/git-serve
+
+
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -28,11 +39,46 @@ metadata:
      app.kubernetes.io/name: git-serve
 spec:
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 8080
+      protocol: TCP
+    - name: ssh
+      port: 22
+      targetPort: 2222
       protocol: TCP
   selector:
      app.kubernetes.io/name: git-serve
+
+
+---
+apiVersion: secretgen.k14s.io/v1alpha1
+kind: Password
+metadata:
+  name: git-serve-http-creds
+spec:
+  length: 24
+  secretTemplate:
+    type: kubernetes.io/basic-auth
+    stringData:
+      username: admin
+      password: $(value)
+
+
+---
+apiVersion: secretgen.k14s.io/v1alpha1
+kind: SSHKey
+metadata:
+  name: git-serve-ssh-server-keys
+spec: {}
+
+
+---
+apiVersion: secretgen.k14s.io/v1alpha1
+kind: SSHKey
+metadata:
+  name: git-serve-ssh-client-keys
+spec: {}
 
 
 ---
@@ -55,20 +101,49 @@ spec:
       volumes:
         - name: git-repositories
           emptyDir: {}
+        - name: ssh-server-keys
+          secret:
+            secretName: git-serve-ssh-server-keys
+            items:
+              - key: ssh-privatekey
+                path: ssh-privatekey
+        - name: ssh-client-keys
+          secret:
+            secretName: git-serve-ssh-server-keys
+            items:
+              - key: ssh-authorizedkey
+                path: ssh-authorizedkey
       imagePullSecrets:
         - name: registry-credentials
       containers:
         - name: git-serve
-          image: cirocosta/git-serve
+          image: image
+          env:
+            - name: GIT_SERVE_HTTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: git-serve-http-creds
+                  key: username
+            - name: GIT_SERVE_HTTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: git-serve-http-creds
+                  key: password
           args:
             - git-serve
-            - -addr=:8080                   # address to bind the server to
-            - -directory=/git-repositories  # where git repositories should be stored
-            - -git=/usr/bin/git             # absolute path to git executable
-            - -verbose                      # turn verbose logs on/off
+            - -v
+            - -data-dir=/git-repositories
+            - -ssh-authorized-keys=/ssh-client-keys/ssh-authorizedkey
+            - -ssh-host-key=/ssh-server-keys/ssh-privatekey
           volumeMounts:
             - mountPath: /git-repositories
               name: git-repositories
+            - mountPath: /ssh-server-keys
+              name: ssh-server-keys
+              readOnly: true
+            - mountPath: /ssh-client-keys
+              name: ssh-client-keys
+              readOnly: true
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

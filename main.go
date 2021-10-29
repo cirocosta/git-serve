@@ -2,100 +2,136 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
-	"path/filepath"
 
-	"github.com/nulab/go-git-http-xfer/githttpxfer"
-	"github.com/peterbourgon/ff/v3/ffcli"
-	log "github.com/sirupsen/logrus"
+	"github.com/peterbourgon/ff/v3"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/cirocosta/git-serve/pkg"
+	"github.com/cirocosta/git-serve/pkg/log"
 )
 
 var (
 	version = "dev"
 
-	cmdFlagSet = flag.NewFlagSet("git-serve serve", flag.ExitOnError)
+	cmdFlagSet = flag.NewFlagSet("git-serve", flag.ExitOnError)
 
-	addr = cmdFlagSet.String(
-		"addr", ":8080",
-		"address to bind the server to",
+	httpBindAddr = cmdFlagSet.String(
+		"http-bind-addr", pkg.HTTPDefaultBindAddr,
+		"address to bind the http server to",
 	)
 
-	directory = cmdFlagSet.String(
-		"directory", "/tmp/git",
-		"where git repositories should be stored",
+	httpUsername = cmdFlagSet.String(
+		"http-username", "admin",
+		"username",
+	)
+
+	httpPassword = cmdFlagSet.String(
+		"http-password", "admin",
+		"password",
+	)
+
+	httpNoAuth = cmdFlagSet.Bool(
+		"http-no-auth", false,
+		"disable default use of basic auth for http",
+	)
+
+	dataDirectory = cmdFlagSet.String(
+		"data-dir", pkg.HTTPDefaultDataDirectory,
+		"directory where repositories will be stored",
 	)
 
 	git = cmdFlagSet.String(
-		"git", "/usr/bin/git",
+		"git", pkg.HTTPDefaultGitExecutableFilepath,
 		"absolute path to git executable",
 	)
 
+	sshBindAddr = cmdFlagSet.String(
+		"ssh-bind-addr", pkg.SSHDefaultBindAddress,
+		"address to bind the ssh server to",
+	)
+
+	sshHostKey = cmdFlagSet.String(
+		"ssh-host-key", "",
+		"path to private key to use for the ssh server",
+	)
+
+	sshAuthorizedKeys = cmdFlagSet.String(
+		"ssh-authorized-keys", "",
+		"path to public keys to authorized (ssh format)",
+	)
+
+	sshNoAuth = cmdFlagSet.Bool(
+		"ssh-no-auth", false,
+		"disable default use of public key auth for ssh",
+	)
+
 	verbose = cmdFlagSet.Bool(
-		"verbose", false,
+		"v", false,
 		"turn verbose logs on/off",
 	)
 )
 
 func main() {
-	cmd := &ffcli.Command{
-		Name:       "git-serve",
-		ShortUsage: "git-serve [<arg> ...]",
-		ShortHelp:  "start the git server",
-		FlagSet:    cmdFlagSet,
-		Exec: func(_ context.Context, _ []string) error {
-			if *verbose {
-				log.SetLevel(log.DebugLevel)
-			}
-
-			return serve(*addr, *directory, *git)
-		},
+	if err := ff.Parse(
+		cmdFlagSet, os.Args[1:],
+		ff.WithEnvVarPrefix("GIT_SERVE_"),
+	); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
-	err := cmd.ParseAndRun(context.Background(), os.Args[1:])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	ctx := pkg.SignalHandlingContext(context.Background())
+	if err := exec(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func serve(bindAddr, dataDirectory, gitFpath string) error {
-	ghx, err := githttpxfer.New(dataDirectory, gitFpath)
-	if err != nil {
-		return fmt.Errorf("githttpxfer new: %w", err)
+func exec(ctx context.Context) error {
+	if *verbose {
+		log.Verbose()
 	}
 
-	log.WithFields(log.Fields{
-		"bind-addr":      bindAddr,
-		"data-directory": dataDirectory,
-		"git-fpath":      gitFpath,
-	}).Info("started")
+	g, ctx := errgroup.WithContext(ctx)
 
-	ghx.Event.On(githttpxfer.BeforeUploadPack, func(ctx githttpxfer.Context) {
-		log.WithField("ctx", ctx).Info("before-upload-pack")
+	g.Go(func() error {
+		ctx := log.WithLogger(ctx, log.From(ctx).
+			WithField("component", "http"),
+		)
+
+		return (&pkg.HTTPServer{
+			BindAddress:           *httpBindAddr,
+			DataDirectory:         *dataDirectory,
+			GitExecutableFilepath: *git,
+			NoAuth:                *httpNoAuth,
+			Password:              *httpPassword,
+			Username:              *httpUsername,
+		}).Run(ctx)
 	})
 
-	ghx.Event.On(githttpxfer.BeforeReceivePack, func(ctx githttpxfer.Context) {
-		log.WithField("ctx", ctx).Info("before-receive-pack")
+	g.Go(func() error {
+		ctx := log.WithLogger(ctx, log.From(ctx).
+			WithField("component", "ssh"),
+		)
+
+		return (&pkg.SSHServer{
+			AuthorizedKeysFilepath: *sshAuthorizedKeys,
+			BindAddress:            *sshBindAddr,
+			DataDirectory:          *dataDirectory,
+			GitExecutableFilepath:  *git,
+			HostKeyFilepath:        *sshHostKey,
+			NoAuth:                 *sshNoAuth,
+		}).Run(ctx)
 	})
 
-	ghx.Event.On(githttpxfer.AfterMatchRouting, func(ctx githttpxfer.Context) {
-		repositoryDirectory := filepath.Join(dataDirectory, ctx.RepoPath())
-
-		err := initDirAsBareRepository(repositoryDirectory)
-		if err != nil {
-			panic(err)
+	if err := g.Wait(); err != nil {
+		if !errors.As(context.Canceled, &err) {
+			return err
 		}
-	})
-
-	chain := NewChain()
-	chain.Use(Logging)
-
-	err = http.ListenAndServe(*addr, chain.Build(ghx))
-	if err != nil {
-		return fmt.Errorf("listen and serve: %w", err)
 	}
 
 	return nil

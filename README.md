@@ -1,36 +1,130 @@
-
 # git-serve
 
-an http git server with no auth that lets you clone & push to repositories
-on-demand.
-
-(pretty much a thin wrapper around github.com/nulab/go-git-http-xfer)
+a toy git server with that lets you clone/push any repositories you want.
 
 
-- [usage](#usage)
-  - [kubernetes](#kubernetes)
-  - [locally](#locally)
-- [license](#license)
 
 ## usage
 
 ```console
 $ git-serve --help
 
-USAGE
-  git-serve [<arg> ...]
-
-FLAGS
-  -addr :8080          address to bind the server to
-  -directory /tmp/git  where git repositories should be stored
-  -git /usr/bin/git    absolute path to git executable
-  -verbose=false       turn verbose logs on/off
+Usage of git-serve:
+  -data-dir string
+        directory where repositories will be stored (default "/tmp/git-serve")
+  -git string
+        absolute path to git executable (default "/usr/bin/git")
+  -http-bind-addr string
+        address to bind the http server to (default ":8080")
+  -http-no-auth
+        disable default use of basic auth for http
+  -http-password string
+        password (default "admin")
+  -http-username string
+        username (default "admin")
+  -ssh-authorized-keys string
+        path to public keys to authorized (ssh format)
+  -ssh-bind-addr string
+        address to bind the ssh server to (default ":2222")
+  -ssh-host-key string
+        path to private key to use for the ssh server
+  -ssh-no-auth
+        disable default use of public key auth for ssh
+  -v    turn verbose logs on/off
 ```
+
+ps.: any of the flags above can be set via environment variables prefixed with
+`GIT_SERVE_`, for instance, to se `-http-password`, use
+`GIT_SERVE_HTTP_PASSWORD`.
+
+### cli
+
+#### no auth
+
+by default, `git-serve` expects to serve repositories over SSH and HTTP with
+auth. to disable that, make use of the `*-no-auth` flags, for instance:
+
+```bash
+git-serve -http-no-auth -ssh-no-auth
+```
+
+which would let you clone/push/pull with no need for providing any credentials
+at all:
+
+```
+git clone ssh://localhost:2222/foo.git .
+git clone http://localhost:2222/foo.git .
+```
+
+note: by default (i.e., unless overwritten by `-ssh-host-key`), the SSH
+server's public key that is used has the following fingerprint:
+
+```
+SHA256:PJo73EJabnFPeCNm1vssGMLsJSv7I9LztZrTwQOIdb8.
+```
+
+
+#### with auth
+
+authn and authz is configured independently via transport-specific flags:
+
+- for http: `-http-username` and `-http-password` configure, correspondingly,
+  the username and password that must be provided via basic auth
+
+- for ssh: `-ssh-authorized-keys` configured the set of client public keys that
+  the server authorizes. note that you can also configure the server's keys via
+  `-ssh-host-key`.
+
+
+example:
+
+1. generate a strong password for http's basic auth:
+
+```console
+$ gpg --gen-random --armor 0 24 | tee password.txt
+lJnhFm7EKVYEOovPbq7+x2J5DKeQr6u7
+```
+
+2. generate both server and client SSH keys
+
+```bash
+for who in server client; do
+  ssh-keygen -b 4096 -t rsa -f $who -q -N "" -C gitserve
+done
+```
+
+to check out the fingerprint of the server pub key that has been generated
+(will be added to your `~/.ssh/known_hosts` in the first connection attempt):
+
+```console
+$ ssh-keygen -lf ./server.pub
+4096 SHA256:y8DKXGUYdySAFGnRzbPUmFaCLbDbWOa10ieOdkF4aZg gitserve (RSA)
+```
+
+
+3. start git-serve pointing at those
+
+
+```console
+git-serve \
+  -http-username=admin \
+  -http-password=$(cat password.txt) \
+  -ssh-host-key ./server \
+  -ssh-authorized-keys ./client.pub
+```
+
+ps.: by default, ports are: `http=8080,ssh=2222`.
 
 
 ### kubernetes
 
-1. run `git-serve` in the cluster as a deployment (fronted by a service)
+under [./dist](./dist) you'll find two reference Kubernetes manifests that can
+be used for deploying `git-serve` to a Kubernetes cluster.
+
+
+#### no auth
+
+make use of the `release-no-auth.yaml` manifest.
 
 
 ```bash
@@ -39,18 +133,18 @@ kubectl create namespace git-serve
 kapp deploy \
   -a git-serve \
   --into-ns git-serve \
-  -f https://github.com/cirocosta/git-serve/releases/latest/download/release.yaml
+  -f https://github.com/cirocosta/git-serve/releases/latest/download/release-no-auth.yaml
 ```
 ```console
 Target cluster 'https://127.0.0.1:45085' (nodes: kind-control-plane)
 
 Changes
 
-Namespace  Name                  Kind          
-git-serve  git-serve            Deployment     
-^          git-serve            Service        
-^          git-serve            ServiceAccount 
-^          registry-credentials  Secret        
+Namespace   Name                  Kind
+git-serve   git-serve             Deployment
+^           git-serve             Service
+^           git-serve             ServiceAccount
+^           registry-credentials  Secret
 
 Op:      4 create, 0 delete, 0 update, 0 noop
 Wait to: 4 reconcile, 0 delete, 0 noop
@@ -70,75 +164,51 @@ Succeeded
 ```
 
 
-2. make use of it
+#### with auth
 
-for instance, running a job `commit-and-push` from the `default` namespace, we
-can target the server running in the `git-serve` namespace from within a pod
-using plain `git clone git-serve.<namespace>`  like
+first, make sure that you have
+[secretgen-controller](https://github.com/vmware-tanzu/carvel-secretgen-controller)
+- it provides to use the ability of declaratively expressing our intention of
+having a secret filled with a strong password and another secret with SSH keys,
+and then once reconciled, it makes those available for us.
 
+the `release-with-auth.yaml` manifest makes use of those kubernetes resources
+provided by secretgen, so you must make sure you have it installed first:
 
 ```bash
-kubectl apply -f <(echo '---
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: commit-and-push
-spec:
-  backoffLimit: 1
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-      - name: run
-        image: golang
-        command:
-          - /bin/bash
-          - -cex
-          - |
-            cd `mktemp -d`
+SECRETGEN_CONTROLLER_VERSION=0.6.0
 
-            git clone http://git-serve.git-serve/foo.git .
-
-            git config user.email "hello@example.com"
-            git config user.name "hello"
-
-            echo "foo" > ./foo
-            git add --all .&& git commit -m "foo" && git push origin HEAD
-')
+kapp deploy -a secretgen-controller \
+  -f https://github.com/vmware-tanzu/carvel-secretgen-controller/releases/download/v$SECRETGEN_CONTROLLER_VERSION/release.yml
 ```
 
-
-### locally
-
-you can also run `git-serve` locally if you wish as long as you have `git`
-installed. 
+then install ours:
 
 ```bash
-go install github.com/cirocosta/git-serve@latest
+kubectl create namespace git-serve
+
+kapp deploy \
+  -a git-serve \
+  --into-ns git-serve \
+  -f https://github.com/cirocosta/git-serve/releases/latest/download/release-with-auth.yaml
+```
+```console
+Namespace  Name                       Kind            Conds.  Age  Op      Op st.  Wait to    Rs  Ri
+default    git-serve                  Deployment      -       -    create  -       reconcile  -   -
+^          git-serve                  Service         -       -    create  -       reconcile  -   -
+^          git-serve                  ServiceAccount  -       -    create  -       reconcile  -   -
+^          git-serve-http-creds       Password        -       -    create  -       reconcile  -   -
+^          git-serve-ssh-client-keys  SSHKey          -       -    create  -       reconcile  -   -
+^          git-serve-ssh-server-keys  SSHKey          -       -    create  -       reconcile  -   -
+^          registry-credentials       Secret          -       -    create  -       reconcile  -   -
 ```
 
-then
+once deployed, we can grab the credentials from the secrets instantiated:
 
-```bash
-# start the server storing repositories at `/tmp/git-serve`.
-#
-git serve -directory=/tmp/git-serve
-
-
-# clone an empty repository
-#
-git clone http://localhost:8080/foo
-
-
-# get inside the repository and write something to a file
-#
-cd foo
-echo "foo" > ./foo
-
-
-# commit and push
-#
-git add --all . && git commit -m "foo" && git push origin HEAD
+```
+kubectl get secret git-serve-ssh-client-keys \
+  -o jsonpath={.data.ssh-privatekey} | \
+  base64 --decode
 ```
 
 
