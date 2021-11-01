@@ -1,3 +1,5 @@
+#@ load("@ytt:data", "data")
+
 ---
 apiVersion: kbld.k14s.io/v1alpha1
 kind: Config
@@ -52,36 +54,6 @@ spec:
 
 
 ---
-apiVersion: secretgen.k14s.io/v1alpha1
-kind: Password
-metadata:
-  name: git-serve-http-creds
-spec:
-  length: 24
-  secretTemplate:
-    type: kubernetes.io/basic-auth
-    stringData:
-      username: admin
-      password: $(value)
-
-
----
-apiVersion: secretgen.k14s.io/v1alpha1
-kind: SSHKey
-metadata:
-  name: git-serve-ssh-server-keys
-spec: {}
-
-
----
-apiVersion: secretgen.k14s.io/v1alpha1
-kind: SSHKey
-metadata:
-  name: git-serve-ssh-client-keys
-spec: {}
-
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -101,6 +73,7 @@ spec:
       volumes:
         - name: git-repositories
           emptyDir: {}
+        #@ if data.values.enable_auth:
         - name: ssh-server-keys
           secret:
             secretName: git-serve-ssh-server-keys
@@ -113,11 +86,13 @@ spec:
             items:
               - key: ssh-authorizedkey
                 path: ssh-authorizedkey
+        #@ end
       imagePullSecrets:
         - name: registry-credentials
       containers:
         - name: git-serve
           image: image
+          #@ if data.values.enable_auth:
           env:
             - name: GIT_SERVE_HTTP_USERNAME
               valueFrom:
@@ -129,21 +104,29 @@ spec:
                 secretKeyRef:
                   name: git-serve-http-creds
                   key: password
+          #@ end
           args:
             - git-serve
             - -v
             - -data-dir=/git-repositories
+            #@ if data.values.enable_auth:
             - -ssh-authorized-keys=/ssh-client-keys/ssh-authorizedkey
             - -ssh-host-key=/ssh-server-keys/ssh-privatekey
+            #@ else:
+            - -ssh-no-auth
+            - -http-no-auth
+            #@ end
           volumeMounts:
             - mountPath: /git-repositories
               name: git-repositories
+           #@ if data.values.enable_auth:
             - mountPath: /ssh-server-keys
               name: ssh-server-keys
               readOnly: true
             - mountPath: /ssh-client-keys
               name: ssh-client-keys
               readOnly: true
+            #@ end
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

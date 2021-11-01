@@ -1,0 +1,32 @@
+#@ load("@ytt:data", "data")
+
+#@ if data.values.enable_auth:
+---
+apiVersion: secretgen.k14s.io/v1alpha1
+kind: Password
+metadata:
+  name: git-serve-http-creds
+spec:
+  length: 24
+  secretTemplate:
+    type: kubernetes.io/basic-auth
+    stringData:
+      username: admin
+      password: $(value)
+
+
+---
+apiVersion: secretgen.k14s.io/v1alpha1
+kind: SSHKey
+metadata:
+  name: git-serve-ssh-server-keys
+spec: {}
+
+
+---
+apiVersion: secretgen.k14s.io/v1alpha1
+kind: SSHKey
+metadata:
+  name: git-serve-ssh-client-keys
+spec: {}
+#@ end
