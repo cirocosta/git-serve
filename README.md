@@ -220,6 +220,85 @@ kubectl get secret git-serve-ssh-client-keys \
 ```
 
 
+## kubernetes custom resource
+
+complete spec:
+
+```yaml
+#       a GIT server that makes use of every auth
+#       feature that there is: for `http` and `ssh`.
+#
+apiVersion: utxo.com.br/v1alpha1
+kind: GitServer
+metadata:
+  name: git-server
+spec:
+  http:
+    auth:
+      # completely disabling auth would permit
+      # anyone to `git clone `<server>/<repo>.git`
+      #
+      disabled: false
+
+      # grab username from a specific field in a
+      # secret.
+      #
+      username:
+        valueFrom:
+          secretKeyRef:
+            name: secret
+            key: username
+
+      # grab password from a specific field in a
+      # secret.
+      #
+      password:
+        valueFrom:
+          secretKeyRef:
+            name: secret
+            key: password
+  ssh:
+    auth:
+      # disabling ssh auth means that _anyone_ can
+      # pull/push via the SSH transport without
+      # presenting either basic auth credentials
+      # or a private key that has been previously
+      # authorized.
+      #
+      # note.: known_hosts verification will still
+      # be performed at the client side unless disabled
+      # (e.g., via StrictHostKeyChecking=no option.)
+      #
+      disabled: false
+
+      # grab clients pub keys from a specific
+      # field in a secret.
+      #
+      authorizedKeys:
+        valueFrom:
+          secretKeyRef:
+            name: secret
+            key: ssh-authorizedkeys
+
+      # grab the server's private key from a
+      # specific field in a secret.
+      #
+      hostKey:
+        valueFrom:
+          secretKeyRef:
+            name: secret
+            key: ssh-privatekey
+status:
+  observedGeneration: <int>
+  conditions:
+    - type: Ready
+      status: True
+  sshServerKnownHosts: |-
+    git-serve ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGm...43JXiUFFAaQ==
+    git-serve.namespace.svc.cluster.local AAAAB3NzaC1yc2EA...43JXiUFFAaQ==
+```
+
+
 ## license
 
 MIT
