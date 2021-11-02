@@ -1,0 +1,6 @@
+apiVersion: ops.tips/v1alpha1
+kind: GitServer
+metadata:
+  name: no-auth
+spec:
+  image: cirocosta/git-serve

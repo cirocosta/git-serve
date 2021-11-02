@@ -6,9 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	SetLevel = logrus.SetLevel
-)
+var SetLevel = logrus.SetLevel
 
 type (
 	Fields = logrus.Fields

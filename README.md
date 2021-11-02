@@ -126,113 +126,40 @@ ps.: by default, ports are: `http=8080,ssh=2222`.
 
 ### kubernetes
 
-under [./dist](./dist) you'll find two reference Kubernetes manifests that can
-be used for deploying `git-serve` to a Kubernetes cluster.
+`git-serve` can also be used as an extension to kubernetes to provision servers
+on-demand.
 
+to install the custom resource definition:
 
-#### no auth
-
-make use of the `release-no-auth.yaml` manifest.
-
-
-```bash
-kubectl create namespace git-serve
-
-kapp deploy \
-  -a git-serve \
-  --into-ns git-serve \
-  -f https://github.com/cirocosta/git-serve/releases/latest/download/release-no-auth.yaml
 ```
+kubectl apply -f https://github.com/cirocosta/git-serve/releases/latest/download/release.yaml
+```
+
+once installed, you should have a new kubernetes kind: GitServer.
+
 ```console
-Target cluster 'https://127.0.0.1:45085' (nodes: kind-control-plane)
-
-Changes
-
-Namespace   Name                  Kind
-git-serve   git-serve             Deployment
-^           git-serve             Service
-^           git-serve             ServiceAccount
-^           registry-credentials  Secret
-
-Op:      4 create, 0 delete, 0 update, 0 noop
-Wait to: 4 reconcile, 0 delete, 0 noop
-
-Continue? [yN]: y
-
-11:58:43AM: ---- applying 2 changes [0/4 done] ----
-11:58:44AM: create secret/registry-credentials (v1) namespace: git-serve
-11:58:44AM: create serviceaccount/git-serve (v1) namespace: git-serve
-11:58:44AM: ---- waiting on 2 changes [0/4 done] ----
-11:58:44AM: ok: reconcile serviceaccount/git-serve (v1) namespace: git-serve
-11:58:44AM: ok: reconcile secret/registry-credentials (v1) namespace: git-serve
-..
-11:58:46AM: ---- waiting complete [4/4 done] ----
-
-Succeeded
+$ kubectl explain gitserver
+KIND:     GitServer
+VERSION:  ops.tips/v1alpha1
+...
 ```
 
 
-#### with auth
-
-first, make sure that you have
-[secretgen-controller](https://github.com/vmware-tanzu/carvel-secretgen-controller)
-- it provides to use the ability of declaratively expressing our intention of
-having a secret filled with a strong password and another secret with SSH keys,
-and then once reconciled, it makes those available for us.
-
-the `release-with-auth.yaml` manifest makes use of those kubernetes resources
-provided by secretgen, so you must make sure you have it installed first:
-
-```bash
-SECRETGEN_CONTROLLER_VERSION=0.6.0
-
-kapp deploy -a secretgen-controller \
-  -f https://github.com/vmware-tanzu/carvel-secretgen-controller/releases/download/v$SECRETGEN_CONTROLLER_VERSION/release.yml
-```
-
-then install ours:
-
-```bash
-kubectl create namespace git-serve
-
-kapp deploy \
-  -a git-serve \
-  --into-ns git-serve \
-  -f https://github.com/cirocosta/git-serve/releases/latest/download/release-with-auth.yaml
-```
-```console
-Namespace  Name                       Kind            Conds.  Age  Op      Op st.  Wait to    Rs  Ri
-default    git-serve                  Deployment      -       -    create  -       reconcile  -   -
-^          git-serve                  Service         -       -    create  -       reconcile  -   -
-^          git-serve                  ServiceAccount  -       -    create  -       reconcile  -   -
-^          git-serve-http-creds       Password        -       -    create  -       reconcile  -   -
-^          git-serve-ssh-client-keys  SSHKey          -       -    create  -       reconcile  -   -
-^          git-serve-ssh-server-keys  SSHKey          -       -    create  -       reconcile  -   -
-^          registry-credentials       Secret          -       -    create  -       reconcile  -   -
-```
-
-once deployed, we can grab the credentials from the secrets instantiated:
-
-```
-kubectl get secret git-serve-ssh-client-keys \
-  -o jsonpath={.data.ssh-privatekey} | \
-  base64 --decode
-```
-
-
-## kubernetes custom resource
-
-complete spec:
+#### spec
 
 ```yaml
-#       a GIT server that makes use of every auth
-#       feature that there is: for `http` and `ssh`.
+# a GIT server that makes use of every auth
+# feature that there is: for `http` and `ssh`.
 #
-apiVersion: utxo.com.br/v1alpha1
+apiVersion: ops.tips/v1alpha1
 kind: GitServer
 metadata:
   name: git-server
 spec:
+  # image to base the pods of
+  #
+  image: cirocosta/git-serve
+
   http:
     auth:
       # completely disabling auth would permit

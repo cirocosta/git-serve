@@ -1,4 +1,4 @@
-package pkg
+package server
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 //
 const SSHDefaultBindAddress = ":2222"
 
-//go:embed ssh/default_host_key.txt
+//go:embed default_host_key.txt
 var defaultHostKey []byte
 
 type SSHServer struct {

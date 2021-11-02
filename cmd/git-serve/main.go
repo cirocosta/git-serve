@@ -12,6 +12,7 @@ import (
 
 	"github.com/cirocosta/git-serve/pkg"
 	"github.com/cirocosta/git-serve/pkg/log"
+	"github.com/cirocosta/git-serve/pkg/server"
 )
 
 var (
@@ -20,7 +21,7 @@ var (
 	cmdFlagSet = flag.NewFlagSet("git-serve", flag.ExitOnError)
 
 	httpBindAddr = cmdFlagSet.String(
-		"http-bind-addr", pkg.HTTPDefaultBindAddr,
+		"http-bind-addr", server.HTTPDefaultBindAddr,
 		"address to bind the http server to",
 	)
 
@@ -40,17 +41,17 @@ var (
 	)
 
 	dataDirectory = cmdFlagSet.String(
-		"data-dir", pkg.HTTPDefaultDataDirectory,
+		"data-dir", server.HTTPDefaultDataDirectory,
 		"directory where repositories will be stored",
 	)
 
 	git = cmdFlagSet.String(
-		"git", pkg.HTTPDefaultGitExecutableFilepath,
+		"git", server.HTTPDefaultGitExecutableFilepath,
 		"absolute path to git executable",
 	)
 
 	sshBindAddr = cmdFlagSet.String(
-		"ssh-bind-addr", pkg.SSHDefaultBindAddress,
+		"ssh-bind-addr", server.SSHDefaultBindAddress,
 		"address to bind the ssh server to",
 	)
 
@@ -103,7 +104,7 @@ func exec(ctx context.Context) error {
 			WithField("component", "http"),
 		)
 
-		return (&pkg.HTTPServer{
+		return (&server.HTTPServer{
 			BindAddress:           *httpBindAddr,
 			DataDirectory:         *dataDirectory,
 			GitExecutableFilepath: *git,
@@ -118,7 +119,7 @@ func exec(ctx context.Context) error {
 			WithField("component", "ssh"),
 		)
 
-		return (&pkg.SSHServer{
+		return (&server.SSHServer{
 			AuthorizedKeysFilepath: *sshAuthorizedKeys,
 			BindAddress:            *sshBindAddr,
 			DataDirectory:          *dataDirectory,

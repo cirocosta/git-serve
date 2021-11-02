@@ -8,8 +8,11 @@ FROM $BUILDER_IMAGE as builder
 
         COPY go.mod 	go.mod
         COPY go.sum 	go.sum
-        COPY main.go 	main.go
+        COPY cmd	cmd
         COPY pkg 	pkg
+
+
+FROM builder AS git-serve
 
         RUN set -x && \
 		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on 	\
@@ -17,7 +20,18 @@ FROM $BUILDER_IMAGE as builder
 			-trimpath 					\
 			-tags osusergo,netgo,static_build 		\
 			-o git-serve 					\
-			.
+			./cmd/git-serve
+
+
+FROM builder AS git-serve-controller
+
+        RUN set -x && \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on 	\
+                go build -a -v 						\
+			-trimpath 					\
+			-tags osusergo,netgo,static_build 		\
+			-o git-serve 					\
+			./cmd/git-serve-controller
 
 
 FROM $RUNTIME_IMAGE
@@ -29,5 +43,7 @@ FROM $RUNTIME_IMAGE
 
 	USER nonroot:nonroot
 
-        COPY --from=builder --chown=1000:1000 \
+        COPY --from=git-serve --chown=1000:1000 \
 		/workspace/git-serve /usr/local/bin/git-serve
+        COPY --from=git-serve-controller --chown=1000:1000 \
+		/workspace/git-serve /usr/local/bin/git-serve-controller

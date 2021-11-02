@@ -1,11 +1,19 @@
-install:
-	go install -v .
+build:
+	mkdir -p dist
+	go build -o dist/git-serve -v ./cmd/git-serve
+	go build -o dist/git-serve-controller -v ./cmd/git-serve-controller
 
-dist:
-	ytt -f ./config | \
-		kbld --images-annotation=false -f- > \
-			./dist/release-no-auth.yaml
-	ytt -f ./config --data-value enable_auth=true | \
-		kbld --images-annotation=false -f- > \
-			./dist/release-with-auth.yaml
-.PHONY: dist
+
+run-controller: build
+	./dist/git-serve-controller
+
+
+install-crds:
+	kapp deploy -a git-serve-controller -f ./config/crd
+
+
+generate:
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen crd rbac:roleName=role \
+		paths=./pkg/apis/v1alpha1
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen object \
+		paths=./pkg/apis/v1alpha1
