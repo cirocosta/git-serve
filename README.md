@@ -2,16 +2,13 @@
 
 a toy git server with that lets you clone/push any repositories you want.
 
-
 - [usage](#usage)
   - [cli](#cli)
     - [no auth](#no-auth)
     - [with auth](#with-auth)
   - [kubernetes](#kubernetes)
-    - [no auth](#no-auth-1)
-    - [with auth](#with-auth-1)
+    - [spec](#spec)
 - [license](#license)
-
 
 ## usage
 
