@@ -1,10 +1,13 @@
-build:
+build: build-git-serve build-git-serve-controller
+
+build-%:
 	mkdir -p dist
-	go build -o dist/git-serve -v ./cmd/git-serve
-	go build -o dist/git-serve-controller -v ./cmd/git-serve-controller
+	CGO_ENABLED=0 go build \
+		-trimpath -tags=osusergo,netgo,static_build \
+		-o dist/$* ./cmd/$*
 
 
-run: build
+run: build-git-serve-controller
 	./dist/git-serve-controller
 
 
@@ -12,9 +15,9 @@ install-crds:
 	kapp deploy -a git-serve-controller -f ./config/crd
 
 
-release:
+k8s-release:
 	mkdir -p dist
-	kbld --images-annotation=false -f config > dist/release.yaml
+	kbld --images-annotation=false -f config > dist/git-serve.yaml
 
 
 generate:
@@ -24,5 +27,9 @@ generate:
 		paths=./pkg/apis/v1alpha1
 
 
-deploy:
-	kapp deploy -a git-serve -f dist/release.yaml
+deploy: k8s-release
+	kapp deploy -a git-serve -f dist
+
+
+publish: build k8s-release
+	./hack/publish.sh
