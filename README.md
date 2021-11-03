@@ -12,7 +12,14 @@ a toy git server with that lets you clone/push any repositories you want.
     - [with auth](#with-auth-1)
 - [license](#license)
 
+
 ## usage
+
+`git-serve` can be used either as a CLI (like, `git serve [args]`), or as an
+extension to kubernetes that lets you provision git servers inside a cluster.
+
+
+### cli
 
 ```console
 $ git-serve --help
@@ -45,7 +52,6 @@ ps.: any of the flags above can be set via environment variables prefixed with
 `GIT_SERVE_`, for instance, to se `-http-password`, use
 `GIT_SERVE_HTTP_PASSWORD`.
 
-### cli
 
 #### no auth
 

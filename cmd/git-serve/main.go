@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -130,9 +129,7 @@ func exec(ctx context.Context) error {
 	})
 
 	if err := g.Wait(); err != nil {
-		if !errors.As(context.Canceled, &err) {
-			return err
-		}
+		log.From(ctx).Error(err)
 	}
 
 	return nil

@@ -10,6 +10,7 @@ const (
 	GitServerConditionReady                              = apis.ConditionReady
 	GitServerConditionDeploymentReady apis.ConditionType = "DeploymentReady"
 	GitServerConditionServiceReady    apis.ConditionType = "ServiceReady"
+	GitServerConditionSecretReady     apis.ConditionType = "SecretReady"
 )
 
 var gitServerCondSet = apis.NewLivingConditionSet(
@@ -68,4 +69,9 @@ func (s *GitServerStatus) PropagateDeploymentStatus(cds *appsv1.DeploymentStatus
 func (s *GitServerStatus) PropagateServiceStatus(ss *corev1.ServiceStatus) {
 	// services don't have meaningful status
 	gitServerCondSet.Manage(s).MarkTrue(GitServerConditionServiceReady)
+}
+
+func (s *GitServerStatus) PropagateSecretStatus() {
+	// secrets don't have meaningful status
+	gitServerCondSet.Manage(s).MarkTrue(GitServerConditionSecretReady)
 }

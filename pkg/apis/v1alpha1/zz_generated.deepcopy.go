@@ -112,6 +112,11 @@ func (in *GitServerStatus) DeepCopyInto(out *GitServerStatus) {
 		*out = new(TypedLocalObjectReference)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.SecretRef != nil {
+		in, out := &in.SecretRef, &out.SecretRef
+		*out = new(TypedLocalObjectReference)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Address != nil {
 		in, out := &in.Address, &out.Address
 		*out = new(Addressable)

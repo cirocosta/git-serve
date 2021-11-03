@@ -27,6 +27,7 @@ type GitServerStatus struct {
 
 	DeploymentRef *TypedLocalObjectReference `json:"deploymentRef,omitempty"`
 	ServiceRef    *TypedLocalObjectReference `json:"serviceRef,omitempty"`
+	SecretRef     *TypedLocalObjectReference `json:"secretRef,omitempty"`
 	Address       *Addressable               `json:"address,omitempty"`
 }
 

@@ -9,11 +9,13 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
-	"github.com/cirocosta/git-serve/pkg"
 	"github.com/cirocosta/git-serve/pkg/apis/v1alpha1"
 	"github.com/cirocosta/git-serve/pkg/controllers"
 )
@@ -26,6 +28,8 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+
+	ctrl.SetLogger(zap.New())
 }
 
 func run(ctx context.Context) error {
@@ -67,7 +71,7 @@ func run(ctx context.Context) error {
 
 func main() {
 	ctx, cancel := context.WithCancel(
-		pkg.SignalHandlingContext(context.Background()),
+		signals.SetupSignalHandler(),
 	)
 	defer cancel()
 
