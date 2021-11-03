@@ -18,11 +18,20 @@ import (
 	v1alpha1 "github.com/cirocosta/git-serve/pkg/apis/v1alpha1"
 )
 
-func GitServerReconciler(c reconcilers.Config) *reconcilers.ParentReconciler {
+const (
+	GitServerSSHDataKeyPrivateKey     = "ssh-privatekey"
+	GitServerSSHDataKeyPublicKey      = "ssh-publickey"
+	GitServerSSHDataKeyAuthorizedKeys = "ssh-authorizedkeys"
+	GitServerSSHDataKeyKnownHosts     = "known_hosts"
+)
+
+func GitServerReconciler(c reconcilers.Config, defaultImage string) *reconcilers.ParentReconciler {
 	return &reconcilers.ParentReconciler{
 		Type: &v1alpha1.GitServer{},
 		Reconciler: reconcilers.Sequence{
+			GitServerDefaultsReconciler(c, defaultImage),
 			GitServerChildSecretSyncReconciler(c),
+			GitServerChildSecretSyncParentSpecReconciler(c),
 			GitServerChildSecretReconciler(c),
 			GitServerChildServiceReconciler(c),
 			GitServerChildDeploymentReconciler(c),
@@ -32,9 +41,44 @@ func GitServerReconciler(c reconcilers.Config) *reconcilers.ParentReconciler {
 	}
 }
 
-func GitServerChildSecretSyncReconciler(c reconcilers.Config) reconcilers.SubReconciler {
-	c.Log = c.Log.WithName("child-secret-sync-reconciler")
+func GitServerDefaultsReconciler(c reconcilers.Config, defaultImage string) reconcilers.SubReconciler {
+	c.Log = c.Log.WithName("defaults-reconciler")
 
+	return &reconcilers.SyncReconciler{
+		Sync: func(ctx context.Context, parent *v1alpha1.GitServer) error {
+			if parent.Spec.Image != "" {
+				return nil
+			}
+
+			parent.Spec.Image = defaultImage
+
+			return nil
+		},
+	}
+}
+
+func SecretFieldValueFetcher(c reconcilers.Config) func(context.Context, v1alpha1.SecretKeyRef, string) ([]byte, error) {
+	return func(ctx context.Context, keyRef v1alpha1.SecretKeyRef, ns string) ([]byte, error) {
+		secret := &corev1.Secret{}
+
+		if err := c.Get(ctx, types.NamespacedName{
+			Name:      keyRef.Name,
+			Namespace: ns,
+		}, secret); err != nil {
+			return nil, fmt.Errorf("get secret '%s': %w",
+				keyRef.Name, err,
+			)
+		}
+
+		if secret.Data == nil {
+			return nil, nil
+		}
+
+		return secret.Data[keyRef.Key], nil
+	}
+}
+
+func GitServerChildSecretSyncReconciler(c reconcilers.Config) reconcilers.SubReconciler {
 	return &reconcilers.SyncReconciler{
 		Sync: func(ctx context.Context, parent *v1alpha1.GitServer) error {
 			if parent.Status.SecretRef == nil {
@@ -56,6 +100,40 @@ func GitServerChildSecretSyncReconciler(c reconcilers.Config) reconcilers.SubRec
 			}
 
 			StashSecretData(ctx, secret.Data)
+			return nil
+		},
+	}
+}
+
+func GitServerChildSecretSyncParentSpecReconciler(c reconcilers.Config) reconcilers.SubReconciler {
+	keyRefFetcher := SecretFieldValueFetcher(c)
+
+	return &reconcilers.SyncReconciler{
+		Sync: func(ctx context.Context, parent *v1alpha1.GitServer) error {
+			data := RetrieveSecretData(ctx)
+
+			if parent.Spec.SSH != nil {
+				if parent.Spec.SSH.Auth.AuthorizedKeys != nil {
+					key, err := keyRefFetcher(ctx, parent.Spec.SSH.Auth.AuthorizedKeys.ValueFrom.SecretKeyRef, parent.Namespace)
+					if err != nil {
+						return err
+					}
+
+					data[GitServerSSHDataKeyAuthorizedKeys] = key
+				}
+
+				if parent.Spec.SSH.Auth.HostKey != nil {
+					key, err := keyRefFetcher(ctx, parent.Spec.SSH.Auth.HostKey.ValueFrom.SecretKeyRef, parent.Namespace)
+					if err != nil {
+						return err
+					}
+
+					data[GitServerSSHDataKeyPrivateKey] = key
+				}
+			}
+
+			StashSecretData(ctx, data)
+
 			return nil
 		},
 	}
@@ -105,13 +183,6 @@ func GitServerChildSecretReconciler(c reconcilers.Config) reconcilers.SubReconci
 	}
 }
 
-const (
-	GitServerSSHDataKeyPrivateKey  = "ssh-privatekey"
-	GitServerSSHDataKeyKnownHosts  = "known_hosts"
-	GitServerSSHDataKeyIdentity    = "identity"
-	GitServerSSHDataKeyIdentityPub = "identity.pub"
-)
-
 func GitServerDesiredSecretChild(
 	ctx context.Context, parent *v1alpha1.GitServer,
 ) (*corev1.Secret, error) {
@@ -128,37 +199,47 @@ func GitServerDesiredSecretChild(
 			Namespace:   parent.Namespace,
 			Labels:      GitServerLabel(parent.Name),
 		},
+		Type: corev1.SecretTypeSSHAuth,
 		Data: data,
 	}
 
-	missingField := false
-	for _, field := range []string{
-		GitServerSSHDataKeyIdentity,
-		GitServerSSHDataKeyIdentityPub,
-		GitServerSSHDataKeyKnownHosts,
-		GitServerSSHDataKeyPrivateKey,
-	} {
-		if v, found := secret.Data[field]; !found || len(v) == 0 {
-			missingField = true
-			break
+	var generatedPriv, generatedPub []byte
+	var err error
+
+	if v, found := secret.Data[GitServerSSHDataKeyPrivateKey]; !found || len(v) == 0 {
+		generatedPriv, generatedPub, err = pkg.GenSSHKeyPair()
+		if err != nil {
+			return nil, fmt.Errorf("gen ssh key pair: %w", err)
 		}
+
+		secret.Data[GitServerSSHDataKeyPrivateKey] = generatedPriv
+		secret.Data[GitServerSSHDataKeyPublicKey] = generatedPub
+		secret.Data[GitServerSSHDataKeyKnownHosts] = []byte(fmt.Sprintf(
+			"%s %s%s %s",
+			parent.Name, string(generatedPub),
+			GitServerAddress(parent), string(generatedPub)),
+		)
 	}
 
-	if !missingField {
-		return secret, nil
+	if v, found := secret.Data[GitServerSSHDataKeyKnownHosts]; !found || len(v) == 0 {
+		pub, err := pkg.DerivePublicFromPrivate(secret.Data[GitServerSSHDataKeyPrivateKey])
+		if err != nil {
+			return nil, fmt.Errorf("derive pub from priv: %w", err)
+		}
+
+		secret.Data[GitServerSSHDataKeyPublicKey] = pub
+
+		secret.Data[GitServerSSHDataKeyKnownHosts] = []byte(fmt.Sprintf(
+			"%s %s%s %s",
+			parent.Name, string(pub),
+			GitServerAddress(parent), string(pub)),
+		)
 	}
 
-	priv, pub, err := pkg.GenSSHKeyPair()
-	if err != nil {
-		return nil, fmt.Errorf("gen ssh key pair: %w", err)
+	if v, found := secret.Data[GitServerSSHDataKeyAuthorizedKeys]; !found || len(v) == 0 {
+		// by default, authorize itself
+		secret.Data[GitServerSSHDataKeyAuthorizedKeys] = secret.Data[GitServerSSHDataKeyPublicKey]
 	}
-
-	secret.Data[GitServerSSHDataKeyIdentity] = priv
-	secret.Data[GitServerSSHDataKeyIdentityPub] = pub
-	secret.Data[GitServerSSHDataKeyPrivateKey] = priv
-	secret.Data[GitServerSSHDataKeyKnownHosts] = []byte(fmt.Sprintf(
-		"[%s] %s", GitServerAddress(parent), string(pub)),
-	)
 
 	return secret, nil
 }
@@ -234,7 +315,7 @@ func GitServerDesiredDeploymentChild(
 }
 
 func GitServerAddress(parent *v1alpha1.GitServer) string {
-	return fmt.Sprintf("http://%s.%s.%s",
+	return fmt.Sprintf("%s.%s.%s",
 		parent.Name, parent.Namespace,
 		"svc.cluster.local",
 	)
@@ -264,7 +345,7 @@ func GitServerChildServiceReconciler(c reconcilers.Config) reconcilers.SubReconc
 				)
 
 			parent.Status.Address = &v1alpha1.Addressable{
-				URL: GitServerAddress(parent),
+				URL: "http://" + GitServerAddress(parent),
 			}
 
 			parent.Status.PropagateServiceStatus(&child.Status)

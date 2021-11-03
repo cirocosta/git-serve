@@ -13,11 +13,56 @@ import (
 
 type GitServerSpec struct {
 	// Image is the image to use for the deployment of gitserver.
-	//
-	Image string `json:"image"`
-
 	// +optional
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+	Image string `json:"image,omitempty"`
+
+	// HTTP *GitServerSpecHTTP `json:"http,omitempty"`
+	// +optional
+	SSH *GitServerSpecSSH `json:"ssh,omitempty"`
+	// +optional
+	HTTP *GitServerSpecHTTP `json:"http,omitempty"`
+}
+
+type GitServerSpecHTTP struct {
+	Auth GitServerSpecHTTPAuth `json:"auth"`
+}
+
+type GitServerSpecHTTPAuth struct {
+	Username *GitServerSpecHTTPAuthUsername `json:"username,omitempty"`
+	Password *GitServerSpecHTTPAuthPassword `json:"password,omitempty"`
+}
+type GitServerSpecHTTPAuthUsername struct {
+	ValueFrom ValueFrom `json:"valueFrom"`
+}
+
+type GitServerSpecHTTPAuthPassword struct {
+	ValueFrom ValueFrom `json:"valueFrom"`
+}
+
+type GitServerSpecSSH struct {
+	Auth GitServerSpecSSHAuth `json:"auth"`
+}
+
+type GitServerSpecSSHAuth struct {
+	AuthorizedKeys *GitServerSpecSSHAuthAuthorizedKeys `json:"authorizedKeys,omitempty"`
+	HostKey        *GitServerSpecSSHAuthHostKey        `json:"hostKey,omitempty"`
+}
+
+type GitServerSpecSSHAuthAuthorizedKeys struct {
+	ValueFrom ValueFrom `json:"valueFrom"`
+}
+
+type GitServerSpecSSHAuthHostKey struct {
+	ValueFrom ValueFrom `json:"valueFrom"`
+}
+
+type ValueFrom struct {
+	SecretKeyRef SecretKeyRef `json:"secretKeyRef"`
+}
+
+type SecretKeyRef struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
 // GitServerStatus defines the observed state of GitServer

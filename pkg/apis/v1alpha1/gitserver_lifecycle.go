@@ -16,6 +16,7 @@ const (
 var gitServerCondSet = apis.NewLivingConditionSet(
 	GitServerConditionDeploymentReady,
 	GitServerConditionServiceReady,
+	GitServerConditionSecretReady,
 )
 
 func (s *GitServerStatus) GetObservedGeneration() int64 {

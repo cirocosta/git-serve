@@ -1,0 +1,28 @@
+apiVersion: ops.tips/v1alpha1
+kind: GitServer
+metadata:
+  name: http-auth
+spec:
+  http:
+    auth:
+      username:
+        valueFrom:
+          secretKeyRef:
+            name: basic-auth
+            key: username
+      password:
+        valueFrom:
+          secretKeyRef:
+            name: basic-auth
+            key: password
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: basic-auth
+type: kubernetes.io/basic-auth
+stringData:
+  username: admin
+  password: admin

@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/peterbourgon/ff/v3"
 	"github.com/vmware-labs/reconciler-runtime/reconcilers"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -23,6 +26,13 @@ import (
 var (
 	scheme     = k8sruntime.NewScheme()
 	syncPeriod = 1 * time.Hour
+
+	cmdFlagSet = flag.NewFlagSet("git-serve-controller", flag.ExitOnError)
+
+	defaultImage = cmdFlagSet.String(
+		"default-image", "cirocosta/git-serve",
+		"default image to use for gitservers",
+	)
 )
 
 func init() {
@@ -49,7 +59,7 @@ func run(ctx context.Context) error {
 
 	err = controllers.GitServerReconciler(reconcilers.NewConfig(
 		mgr, &v1alpha1.GitServer{}, syncPeriod,
-	)).SetupWithManager(ctx, mgr)
+	), *defaultImage).SetupWithManager(ctx, mgr)
 	if err != nil {
 		return fmt.Errorf("gitserver reconciler setupwithmgr: %w", err)
 	}
@@ -74,6 +84,14 @@ func main() {
 		signals.SetupSignalHandler(),
 	)
 	defer cancel()
+
+	if err := ff.Parse(
+		cmdFlagSet, os.Args[1:],
+		ff.WithEnvVarPrefix("GIT_SERVE_"),
+	); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	if err := run(ctx); err != nil {
 		panic(err)

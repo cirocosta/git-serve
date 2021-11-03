@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 
 	gossh "golang.org/x/crypto/ssh"
 )
@@ -32,4 +33,13 @@ func GenSSHKeyPair() ([]byte, []byte, error) {
 	}
 
 	return privateKeyBuf.Bytes(), gossh.MarshalAuthorizedKey(publicKey), err
+}
+
+func DerivePublicFromPrivate(b []byte) ([]byte, error) {
+	parsedPrivateKey, err := gossh.ParsePrivateKey(b)
+	if err != nil {
+		return nil, fmt.Errorf("parse priv key: %w", err)
+	}
+
+	return gossh.MarshalAuthorizedKey(parsedPrivateKey.PublicKey()), nil
 }

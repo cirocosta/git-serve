@@ -1,0 +1,123 @@
+---
+apiVersion: kbld.k14s.io/v1alpha1
+kind: Config
+searchRules:
+  - valueMatcher:
+      imageRepo: cirocosta/git-serve
+sources:
+  - image: ghcr.io/cirocosta/git-serve
+    path: .
+destinations:
+  - image: ghcr.io/cirocosta/git-serve
+    newImage: ghcr.io/cirocosta/git-serve
+
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: git-serve-controller
+
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: git-serve-controller
+  namespace: git-serve-controller
+
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: git-serve-controller
+rules:
+  - apiGroups:
+      - 'ops.tips'
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - apiGroups:
+      - ''
+    resources:
+      - 'secrets'
+      - 'services'
+      - 'events'
+    verbs:
+      - '*'
+  - apiGroups:
+      - 'apps'
+    resources:
+      - 'deployments'
+    verbs:
+      - '*'
+
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: git-serve-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: git-serve-controller
+subjects:
+  - kind: ServiceAccount
+    name: git-serve-controller
+    namespace: git-serve-controller
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-serve-controller
+  namespace: git-serve-controller
+spec:
+  selector:
+    matchLabels:
+      control-plane: git-serve-controller
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: git-serve-controller
+    spec:
+      serviceAccountName: git-serve-controller
+      terminationGracePeriodSeconds: 10
+      containers:
+        - image: ghcr.io/cirocosta/git-serve
+          name: git-serve-controller
+          args:
+            - git-serve-controller
+          env:
+            - name: GIT_SERVE_DEFAULT_IMAGE
+              value: ghcr.io/cirocosta/git-serve
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - all
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 100Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi

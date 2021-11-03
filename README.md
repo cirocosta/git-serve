@@ -168,11 +168,6 @@ spec:
 
   http:
     auth:
-      # completely disabling auth would permit
-      # anyone to `git clone `<server>/<repo>.git`
-      #
-      disabled: false
-
       # grab username from a specific field in a
       # secret.
       #
@@ -192,18 +187,6 @@ spec:
             key: password
   ssh:
     auth:
-      # disabling ssh auth means that _anyone_ can
-      # pull/push via the SSH transport without
-      # presenting either basic auth credentials
-      # or a private key that has been previously
-      # authorized.
-      #
-      # note.: known_hosts verification will still
-      # be performed at the client side unless disabled
-      # (e.g., via StrictHostKeyChecking=no option.)
-      #
-      disabled: false
-
       # grab clients pub keys from a specific
       # field in a secret.
       #
@@ -226,9 +209,6 @@ status:
   conditions:
     - type: Ready
       status: True
-  sshServerKnownHosts: |-
-    git-serve ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGm...43JXiUFFAaQ==
-    git-serve.namespace.svc.cluster.local AAAAB3NzaC1yc2EA...43JXiUFFAaQ==
 ```
 
 

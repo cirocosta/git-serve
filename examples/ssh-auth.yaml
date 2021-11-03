@@ -1,0 +1,81 @@
+apiVersion: ops.tips/v1alpha1
+kind: GitServer
+metadata:
+  name: ssh-auth
+spec:
+  http:
+    auth: {}
+  ssh:
+    auth:
+      hostKey:
+        valueFrom:
+          secretKeyRef:
+            name: ssh-auth
+            key: ssh-privatekey
+      authorizedKeys:
+        valueFrom:
+          secretKeyRef:
+            name: ssh-auth
+            key: authorized-key
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ssh-auth
+type: kubernetes.io/ssh-auth
+stringData:
+  ssh-privatekey: |-
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    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
+    -----END OPENSSH PRIVATE KEY-----
+
+  authorized-key: |-
+    ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDA0BS8GxxlTFpi0HEcLr9DmGvD0bHHWErP9A4FRo8igW3uoLu6/+55cPbikCyvKEHs+3/BMY6ZYmr3srwCLKgvqVX7i1wN5dr8tJi+wE6tj+XTHKV2hAKRiFdMsSssnafEsxMJaaKlRHf0pwTw3RBbMiyrKpiKydOLy++6o8W3MsoYpGqDbr9CSpt+tNsixndZ5GKMlRz3pYdNZF5PV5rnNlqFQ8rt1YPyfTZj8m9RaqsXkRFy+Phv4b6afwjruDgMYLL6+cxBi3kebA8zRbq9H67oQXO12aagrETuXwGhQmysP+Bb7EdMi9t7hm5Hm26GMeA7h+zoce4qKhuwwTh4xNS09jAK++3fV1IGCStmZwBQJhpq1Muc3o4QsLWE86yzKndHUYUKyR3zckuGnOrN5+/j67HtFKekc2O8OPDeX6qlFdauTeTyEANNYUB1AN/KAwxRmFXCOYVe86hRqm45/kw7greVFe7mDw0z5kZqdAlUo25OkkHlJYjKHUmcygizu13NsBDApEKXvbqJGaQJ/SkUh4bJ6wf61k41fOf5TFfA5kq4o265lbGMfsB7niJjh7GfF8U4uPbtXNAO60A3khcWz2EJSmJYE4GLYQUwcjrdZa4Glux0GODsGDHZeyDEuuQXY+WcaTAsoyF3Bkf+sKbilkat3gW+YVMTK4lU6w==

@@ -47,13 +47,106 @@ spec:
             type: object
           spec:
             properties:
+              http:
+                properties:
+                  auth:
+                    properties:
+                      password:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      username:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                    type: object
+                required:
+                - auth
+                type: object
               image:
                 description: Image is the image to use for the deployment of gitserver.
                 type: string
-              serviceAccountName:
-                type: string
-            required:
-            - image
+              ssh:
+                description: HTTP *GitServerSpecHTTP `json:"http,omitempty"`
+                properties:
+                  auth:
+                    properties:
+                      authorizedKeys:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      hostKey:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                    type: object
+                required:
+                - auth
+                type: object
             type: object
           status:
             description: GitServerStatus defines the observed state of GitServer

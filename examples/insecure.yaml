@@ -1,0 +1,5 @@
+apiVersion: ops.tips/v1alpha1
+kind: GitServer
+metadata:
+  name: insecure
+spec: {}
