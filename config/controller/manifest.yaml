@@ -71,6 +71,16 @@ subjects:
 
 
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: git-serve-controller
+  namespace: git-serve-controller
+data:
+  image: ghcr.io/cirocosta/git-serve
+
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -95,7 +105,10 @@ spec:
             - git-serve-controller
           env:
             - name: GIT_SERVE_DEFAULT_IMAGE
-              value: ghcr.io/cirocosta/git-serve
+              valueFrom:
+                configMapKeyRef:
+                  name: git-serve-controller
+                  key: image
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

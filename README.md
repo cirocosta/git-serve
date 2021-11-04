@@ -135,7 +135,7 @@ on-demand.
 to install the custom resource definition:
 
 ```
-kubectl apply -f https://github.com/cirocosta/git-serve/releases/latest/download/release.yaml
+kubectl apply -f https://github.com/cirocosta/git-serve/releases/latest/download/git-serve.yaml
 ```
 
 once installed, you should have a new kubernetes kind: GitServer.
