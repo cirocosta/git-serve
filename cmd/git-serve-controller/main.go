@@ -30,7 +30,7 @@ var (
 	cmdFlagSet = flag.NewFlagSet("git-serve-controller", flag.ExitOnError)
 
 	defaultImage = cmdFlagSet.String(
-		"default-image", "cirocosta/git-serve",
+		"default-image", "ghcr.io/cirocosta/git-serve",
 		"default image to use for gitservers",
 	)
 )
@@ -87,7 +87,7 @@ func main() {
 
 	if err := ff.Parse(
 		cmdFlagSet, os.Args[1:],
-		ff.WithEnvVarPrefix("GIT_SERVE_"),
+		ff.WithEnvVarPrefix("GIT_SERVE"),
 	); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
