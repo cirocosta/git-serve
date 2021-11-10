@@ -11,6 +11,10 @@ run: build-git-serve-controller
 	./dist/git-serve-controller
 
 
+install:
+	go install -v ./cmd/git-serve
+
+
 install-crds:
 	kapp deploy -a git-serve-controller -f ./config/crd
 
