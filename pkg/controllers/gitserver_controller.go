@@ -412,15 +412,6 @@ func GitServerLabel(name string) map[string]string {
 }
 
 func GitServerPodTemplateSpec(parent *v1alpha1.GitServer) corev1.PodTemplateSpec {
-	args := []string{
-		"git-serve",
-		"-v",
-		"-data-dir=/git-data",
-		"-ssh-no-auth",
-		"-ssh-host-key=/ssh-secret/ssh-privatekey",
-		"-http-no-auth",
-	}
-
 	sshSecretVolume := corev1.Volume{
 		Name: "ssh",
 		VolumeSource: corev1.VolumeSource{
@@ -449,7 +440,6 @@ func GitServerPodTemplateSpec(parent *v1alpha1.GitServer) corev1.PodTemplateSpec
 		Name:            "git-serve",
 		Image:           parent.Spec.Image,
 		ImagePullPolicy: corev1.PullAlways,
-		Args:            args,
 		VolumeMounts: []corev1.VolumeMount{
 			{
 				Name:      sshSecretVolume.Name,
@@ -462,7 +452,61 @@ func GitServerPodTemplateSpec(parent *v1alpha1.GitServer) corev1.PodTemplateSpec
 		},
 	}
 
-	template := corev1.PodTemplateSpec{
+	container.Args = []string{
+		"git-serve",
+		"-v",
+		"-data-dir=/git-data",
+		"-ssh-host-key=/ssh-secret/ssh-privatekey",
+	}
+
+	if parent.Spec.SSH == nil {
+		container.Args = append(container.Args, "-ssh-no-auth")
+	}
+
+	if parent.Spec.HTTP == nil {
+		container.Args = append(container.Args, "-http-no-auth")
+	}
+
+	if parent.Spec.SSH != nil {
+		sshauth := parent.Spec.SSH.Auth
+		if name := sshauth.AuthorizedKeys.ValueFrom.SecretKeyRef.Name; name != "" {
+			container.Args = append(container.Args,
+				"-ssh-authorized-keys=/ssh-secret/"+GitServerSSHDataKeyAuthorizedKeys,
+			)
+		}
+	}
+
+	if parent.Spec.HTTP != nil {
+		usernameRef := parent.Spec.HTTP.Auth.Username.ValueFrom.SecretKeyRef
+		passwordRef := parent.Spec.HTTP.Auth.Password.ValueFrom.SecretKeyRef
+
+		container.Env = append(container.Env, []corev1.EnvVar{
+			{
+				Name: "GIT_SERVE_HTTP_USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: usernameRef.Name,
+						},
+						Key: usernameRef.Key,
+					},
+				},
+			},
+			{
+				Name: "GIT_SERVE_HTTP_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: passwordRef.Name,
+						},
+						Key: passwordRef.Key,
+					},
+				},
+			},
+		}...)
+	}
+
+	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: GitServerLabel(parent.Name),
 		},
@@ -477,8 +521,6 @@ func GitServerPodTemplateSpec(parent *v1alpha1.GitServer) corev1.PodTemplateSpec
 			},
 		},
 	}
-
-	return template
 }
 
 const SecretDataStashKey reconcilers.StashKey = v1alpha1.Group + "/secret-data"
