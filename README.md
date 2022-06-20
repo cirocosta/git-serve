@@ -208,6 +208,37 @@ status:
       status: True
 ```
 
+## api
+
+### repository tree
+
+```
+GET /api/tree/:repository?rev=<>
+200 OK
+
+  {
+    "sha": "0xf00",
+    "tree": [
+      {
+        "path": "foo.bar"
+        "mode": "",
+        "type": "",
+        "digest": "sha256:...",
+        "url": "sha256:...",
+      },
+    ]
+  }
+```
+
+### file
+
+```
+GET /api/blob/:repository/?
+200 OK
+
+  ... file contents
+```
+
 
 ## license
 

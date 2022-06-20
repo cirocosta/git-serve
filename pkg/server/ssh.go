@@ -263,8 +263,9 @@ func exitCodeFromError(err error) int {
 
 	waitStatus, ok := exitErr.Sys().(syscall.WaitStatus)
 	if !ok {
-		// This is a fallback and should at least let us return something useful
-		// when running on Windows, even if it isn't completely accurate.
+		// This is a fallback and should at least let us return
+		// something useful when running on Windows, even if it isn't
+		// completely accurate.
 		if exitErr.Success() {
 			return 0
 		}

@@ -8,6 +8,39 @@ import (
 	"strings"
 )
 
+func listFiles(dir, rev string) ([]string, error) {
+	// objectmode
+	//     The mode of the object.
+	//
+	// objecttype
+	//     The type of the object (commit, blob or tree).
+	//
+	// objectname
+	//     The name of the object.
+	//
+	// objectsize[:padded]
+	//     The size of a blob object ("-" if it’s a commit or tree).
+	//
+	// path
+	//     The pathname of the object.
+	//
+	const format = `%(path)`
+
+	output, err := execAt(dir, "git",
+		"ls-tree", "--full-tree", "-r", "--format="+format, rev,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ls-tree '%s' '%s: %w", dir, rev, err)
+	}
+
+	files := []string{}
+	for _, line := range strings.Split(string(output), "\n") {
+		files = append(files, line)
+	}
+
+	return files, nil
+}
+
 func initDirAsBareRepository(dir string) error {
 	_, err := os.Stat(dir)
 	if err != nil {
