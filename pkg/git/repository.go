@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/google/shlex"
 )
 
 var (
@@ -34,15 +36,17 @@ var (
 type repository struct {
 	// runner is reponsible for running `git` commands.
 	//
-	runner Runner
+	runner    Runner
+	directory string
 }
 
 // NewRepository instantiates a new repository whose contents should be stored
 // under a particular directory.
 //
-func NewRepository(dir string) *repository {
+func NewRepository(directory string) *repository {
 	return &repository{
-		runner: NewRunner(),
+		runner:    NewRunner(),
+		directory: directory,
 	}
 }
 
@@ -60,7 +64,7 @@ func (r *repository) WithRunner(runner Runner) *repository {
 // be taken.
 //
 func (r *repository) Init(ctx context.Context) error {
-	return nil
+	return initDirAsBareRepository(r.directory)
 }
 
 // Files lists the files in a repository at a particular ref.
@@ -69,19 +73,35 @@ func (r *repository) Init(ctx context.Context) error {
 // repository at the latest commit under the `master` branch.
 //
 func (r *repository) Files(ctx context.Context, ref string) ([]File, error) {
-	// git ls-tree --full-tree -r HEAD --format='%(objectname) %(objecttype) %(objectsize)%x00%(path)'
+
+	println("dir", r.directory)
+
+	out, err := runAt(r.directory,
+		`git ls-tree --full-tree -r %s --format="%s"`,
+		ref, LSTreeFormat)
+	if err != nil {
+		return nil, fmt.Errorf("git ls-tree: %w", err)
+	}
+
+	println(out)
+
 	return nil, nil
 }
 
 func initDirAsBareRepository(dir string) error {
-	_, err := os.Stat(dir)
+	createdByUs, err := findOrCreateDir(dir)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("stat '%s': %w", dir, err)
+		return fmt.Errorf("find or create dir '%s': %w", dir, err)
+	}
+
+	if !createdByUs {
+		filesInDirectory, err := os.ReadDir(dir)
+		if err != nil {
+			return fmt.Errorf("readdir '%s': %w", dir, err)
 		}
 
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("mkdir '%s': %w", dir, err)
+		if n := len(filesInDirectory); n > 0 {
+			return fmt.Errorf("dir '%s' already has %d files", dir, n)
 		}
 	}
 
@@ -100,6 +120,26 @@ func initDirAsBareRepository(dir string) error {
 	}
 
 	return nil
+}
+
+func findOrCreateDir(dir string) (bool, error) {
+	createdByUs := true
+	notCreatedByUs := !createdByUs
+
+	_, err := os.Stat(dir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return false, fmt.Errorf("stat '%s': %w", dir, err)
+		}
+
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return false, fmt.Errorf("mkdir '%s': %w", dir, err)
+		}
+
+		return createdByUs, nil
+	}
+
+	return notCreatedByUs, nil
 }
 
 func initBareRepository(dir string) error {
@@ -134,4 +174,21 @@ func execAt(dir string, name string, arg ...string) ([]byte, error) {
 	c := exec.Command(name, arg...)
 	c.Dir = dir
 	return c.CombinedOutput()
+}
+
+func runAt(dir, format string, args ...interface{}) (string, error) {
+	argv, err := shlex.Split(fmt.Sprintf(format, args...))
+	if err != nil {
+		return "", fmt.Errorf("shlex split: %w", err)
+	}
+
+	c := exec.Command(argv[0], argv[1:]...)
+	c.Dir = dir
+
+	b, err := c.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("combinet output: %w", err)
+	}
+
+	return strings.TrimSpace(string(b)), nil
 }
