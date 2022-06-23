@@ -12,10 +12,17 @@ import (
 )
 
 var (
-	// LSTreeSeparator is the character set to use to denote the
-	// separation between the fields for each row of `git ls-tree`.
+	// LSTreeFormatSeparator is the character set in `ls-tree` format
+	// specification to use to denote the separation between the fields for
+	// each row of `git ls-tree`.
 	//
-	LSTreeSeparator = `%x00`
+	LSTreeFormatSeparator = `%x00`
+
+	// LSTreeSeparator is the character set revealed in the output to use
+	// to denote the separation between the fields for each row of `git
+	// ls-tree`.
+	//
+	LSTreeSeparator = "\x00"
 
 	// LSTreeFormatFields denotes the set of fields to include in the
 	// `--format` flat passed to `git ls-tree`.
@@ -30,7 +37,7 @@ var (
 	// LSTreeFormat is the full value passue to `--format` to denote how
 	// each row should be formatted.
 	//
-	LSTreeFormat = strings.Join(LSTreeFormatFields, LSTreeSeparator)
+	LSTreeFormat = strings.Join(LSTreeFormatFields, LSTreeFormatSeparator)
 )
 
 type repository struct {
@@ -39,6 +46,8 @@ type repository struct {
 	runner    Runner
 	directory string
 }
+
+var _ Repository = (*repository)(nil)
 
 // NewRepository instantiates a new repository whose contents should be stored
 // under a particular directory.
@@ -57,6 +66,13 @@ func (r *repository) WithRunner(runner Runner) *repository {
 	return r
 }
 
+// Directory returns the directory where the repository's data is being stored
+// at.
+//
+func (r *repository) Directory() string {
+	return r.directory
+}
+
 // Init initializes the directory where this repository should be set up as a
 // bare repository.
 //
@@ -73,9 +89,6 @@ func (r *repository) Init(ctx context.Context) error {
 // repository at the latest commit under the `master` branch.
 //
 func (r *repository) Files(ctx context.Context, ref string) ([]File, error) {
-
-	println("dir", r.directory)
-
 	out, err := runAt(r.directory,
 		`git ls-tree --full-tree -r %s --format="%s"`,
 		ref, LSTreeFormat)
@@ -83,9 +96,19 @@ func (r *repository) Files(ctx context.Context, ref string) ([]File, error) {
 		return nil, fmt.Errorf("git ls-tree: %w", err)
 	}
 
-	println(out)
+	files := []File{}
+	for _, row := range strings.Fields(out) {
+		f, err := NewFile(r, row)
+		if err != nil {
+			return nil, fmt.Errorf("new file from row '%s': %w",
+				row, err,
+			)
+		}
 
-	return nil, nil
+		files = append(files, f)
+	}
+
+	return files, nil
 }
 
 func initDirAsBareRepository(dir string) error {
@@ -186,9 +209,12 @@ func runAt(dir, format string, args ...interface{}) (string, error) {
 	c.Dir = dir
 
 	b, err := c.CombinedOutput()
+	output := strings.TrimSpace(string(b))
 	if err != nil {
-		return "", fmt.Errorf("combinet output: %w", err)
+		return "", fmt.Errorf("combined output: %w, output: '%s'",
+			err, output,
+		)
 	}
 
-	return strings.TrimSpace(string(b)), nil
+	return output, nil
 }

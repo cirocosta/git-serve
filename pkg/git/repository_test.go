@@ -68,9 +68,15 @@ func TestRepositoryFiles_empty(t *testing.T) {
 		t.Fatalf("init: expect no err, got '%v'", err)
 	}
 
+	// with no files at all, we expect listing to fail as the ref wouldn't
+	// exist just yet
+	//
 	files, err := repository.Files(ctx, "main")
-	if err != nil {
-		t.Fatalf("files: expected no err, got '%v'", err)
+	if err == nil {
+		t.Fatalf("files: expected err, got '%v'", err)
+	}
+	if !strings.Contains(err.Error(), "Not a valid object name main") {
+		t.Fatalf("files: expected err to mention `main` not valid name")
 	}
 
 	if len(files) != 0 {
