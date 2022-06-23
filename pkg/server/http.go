@@ -9,6 +9,7 @@ import (
 
 	"github.com/nulab/go-git-http-xfer/githttpxfer"
 
+	"github.com/cirocosta/git-serve/pkg/git"
 	"github.com/cirocosta/git-serve/pkg/log"
 )
 
@@ -64,8 +65,9 @@ func (s *HTTPServer) onRouteMatch(xferCtxt githttpxfer.Context) {
 		xferCtxt.RepoPath(),
 	)
 
-	err := initDirAsBareRepository(repositoryDirectory)
-	if err != nil {
+	repository := git.NewRepository(repositoryDirectory)
+
+	if err := repository.Init(context.TODO()); err != nil {
 		panic(err)
 	}
 }

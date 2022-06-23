@@ -124,6 +124,15 @@ func initDirAsBareRepository(dir string) error {
 		}
 
 		if n := len(filesInDirectory); n > 0 {
+			isBare, err := isBareRepository(dir)
+			if err != nil {
+				return fmt.Errorf("is bare check: %w", err)
+			}
+
+			if isBare {
+				return nil
+			}
+
 			return fmt.Errorf("dir '%s' already has %d files", dir, n)
 		}
 	}

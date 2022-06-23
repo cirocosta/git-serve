@@ -23,12 +23,17 @@ func TestRepositoryInit_fresh(t *testing.T) {
 	repository := git.NewRepository(dir)
 
 	if err := repository.Init(context.Background()); err != nil {
-		t.Fatalf("init: %v", err)
+		t.Fatalf("init: expected no errors, got %v", err)
 	}
 
 	isBare := mustRunAt(dir, "git rev-parse --is-bare-repository")
 	if isBare != "true" {
 		t.Fatalf("is bare: '%v'", isBare)
+	}
+
+	// ensure idempotency
+	if err := repository.Init(context.Background()); err != nil {
+		t.Fatalf("init: expected no err after re-init, got %v", err)
 	}
 }
 
