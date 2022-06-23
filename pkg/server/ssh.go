@@ -14,6 +14,7 @@ import (
 	"github.com/google/shlex"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/cirocosta/git-serve/pkg/git"
 	"github.com/cirocosta/git-serve/pkg/log"
 )
 
@@ -149,7 +150,9 @@ func (s *SSHServer) runSessionCmd(ctx context.Context, session ssh.Session) erro
 	}
 
 	repositoryDirectory := filepath.Join(s.DataDirectory, args[len(args)-1])
-	err = initDirAsBareRepository(repositoryDirectory)
+	repository := git.NewRepository(repositoryDirectory)
+
+	err = repository.Init(ctx)
 	if err != nil {
 		return fmt.Errorf("init dir as bar repo: %w", err)
 	}
@@ -263,8 +266,9 @@ func exitCodeFromError(err error) int {
 
 	waitStatus, ok := exitErr.Sys().(syscall.WaitStatus)
 	if !ok {
-		// This is a fallback and should at least let us return something useful
-		// when running on Windows, even if it isn't completely accurate.
+		// This is a fallback and should at least let us return
+		// something useful when running on Windows, even if it isn't
+		// completely accurate.
 		if exitErr.Success() {
 			return 0
 		}

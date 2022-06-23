@@ -37,3 +37,7 @@ deploy: k8s-release
 
 publish: build k8s-release
 	./hack/publish.sh
+
+
+test:
+	go test -v ./pkg/git

@@ -4,7 +4,9 @@ go 1.17
 
 require (
 	github.com/gliderlabs/ssh v0.3.3
+	github.com/google/go-cmp v0.5.6
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
+	github.com/hashicorp/go-multierror v1.0.0
 	github.com/nulab/go-git-http-xfer v1.4.0
 	github.com/peterbourgon/ff/v3 v3.1.2
 	github.com/sirupsen/logrus v1.8.1
@@ -34,10 +36,10 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
